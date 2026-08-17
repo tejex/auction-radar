@@ -1,8 +1,8 @@
-import { massive } from "../clients/massive.ts"
+import { getMassiveClient } from "../clients/massive.ts"
 import { saveDailyBars } from "./marketData.ts"
 
 export async function loadMassiveMarketDay(date: string) {
-  const data = await massive.getGroupedStocksAggregates({
+  const data = await getMassiveClient().getGroupedStocksAggregates({
     date,
     adjusted: true,
   })
@@ -13,7 +13,7 @@ export async function loadMassiveMarketDay(date: string) {
     throw new Error(`Massive returned no bars for ${date}`)
   }
 
-  saveDailyBars(bars, date, {
+  await saveDailyBars(bars, date, {
     source: "massive",
     adjustment: "split",
   })

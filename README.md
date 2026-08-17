@@ -1,60 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Auction Radar
 
-## Getting Started
+Auction Radar is a Next.js market scanner. It uses the existing SQLite database
+for local development and switches to Neon Postgres when `DATABASE_URL` is set.
+The local `data/` directory remains ignored by Git.
 
-First, run the development server:
+## Local development
+
+Copy the environment-variable template and add the API keys you use:
 
 ```bash
+cp .env.example .env
+npm install
+npm run db:setup
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Open [http://localhost:3000](http://localhost:3000). No separate Fastify process
+is required by the Next.js app. The production scanner endpoint is available at
+`/api/scanner`, and chart data is served by `/api/bars/[ticker]`.
 
 ## Load end-of-day market data
 
-Massive is only called by the explicit EOD job. Pass the completed market date in
-`YYYY-MM-DD` format:
+Pass a completed market date in `YYYY-MM-DD` format:
 
 ```bash
 npm run load:eod -- 2026-08-14
 ```
 
-The job requests split-adjusted grouped daily bars, writes them to SQLite, and
-records `massive` and `split` in the row's provenance fields. It also refreshes
-type and market-cap metadata for that day's outlier candidates. Running the
-scanner never calls Massive.
+The job requests split-adjusted grouped daily bars, refreshes security metadata,
+runs the scanner, and saves the ranked results. Running the scanner itself does
+not call Massive.
 
-The scanner applies the V1 universe filters, ranks qualifying outliers by the
-weighted score, and returns at most 40 names. Securities without cached metadata
-are excluded until the next EOD load refreshes them.
+## Move the local database to Neon
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a Neon Postgres database and copy its connection string.
+2. Set `DATABASE_URL` in `.env` without removing the existing API keys.
+3. Create the Postgres tables:
 
-## Learn More
+   ```bash
+   npm run db:setup
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. Import `data/auction-radar.db`:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   ```bash
+   npm run db:migrate:sqlite
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The import runs in batches, prints progress, and uses upserts, so it is safe to
+restart if the connection is interrupted. It never writes to the SQLite source.
+Because the source contains more than four million bars, the initial import can
+take a while.
 
-## Deploy on Vercel
+To switch local development back to SQLite, remove `DATABASE_URL` from `.env`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Deploy to Vercel
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push the repository to GitHub.
+2. Import the repository from the Vercel dashboard.
+3. Connect the Neon database to the Vercel project.
+4. Configure these production environment variables:
 
+   ```text
+   DATABASE_URL
+   MASSIVE_API_KEY
+   ALPACA_API_KEY
+   ALPACA_SECRET_KEY
+   CRON_SECRET
+   ```
 
-#so far:
-- shadcn
-- tanstack
-- fastify
+5. Deploy after the database import has completed.
+
+`vercel.json` invokes `/api/cron/eod` at 23:30 UTC on weekdays. Vercel supplies
+`Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is configured. The route
+rejects unauthenticated requests and can also be tested manually with a date:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" \
+  "http://localhost:3000/api/cron/eod?date=2026-08-14"
+```
+
+The Massive metadata endpoint is rate limited. If a daily run needs to refresh
+many previously unseen tickers, it can exceed a serverless function's duration;
+that refresh should then be moved to a dedicated background worker while the
+read APIs remain on Vercel.

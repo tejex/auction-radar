@@ -92,7 +92,7 @@ async function fetchBatch(symbols: string[]) {
     }
 
     for (const [date, bars] of barsByDate) {
-      saveDailyBars(bars, date, {
+      await saveDailyBars(bars, date, {
         source: "alpaca",
         adjustment: "split",
       })
@@ -106,7 +106,7 @@ async function fetchBatch(symbols: string[]) {
 }
 
 async function backFill() {
-  const tickers = getTickersForLatestDate()
+  const tickers = await getTickersForLatestDate()
 
   // Don't put thousands of symbols into one URL
   const batches = chunk(tickers, 200)

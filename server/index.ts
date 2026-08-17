@@ -1,38 +1,29 @@
 import Fastify from "fastify"
-import { db } from "./db/client.ts"
+import { getDailyBarCount } from "./db/queries.ts"
+import { initializeDatabase } from "./db/schema.ts"
 import { scannerRoutes } from "./routes/scanner.ts"
 import { runScanner } from "./services/serviceFunctions.ts"
-import "./db/schema.ts"
 
-const fastify = Fastify({
-  logger: true
-})
+await initializeDatabase()
+
+const fastify = Fastify({ logger: true })
 
 fastify.register(scannerRoutes)
 
-/****************************************************************/
-fastify.get('/', async () => {
-  return {
-    service: "auction-radar-api",
-    status: "ok",
-  }
-})
-/****************************************************************/
-fastify.get("/count", async () => {
-  const row = db
-    .prepare("SELECT COUNT(*) as count FROM daily_bars")
-    .get()
+fastify.get("/", async () => ({
+  service: "auction-radar-api",
+  status: "ok",
+}))
 
-  return row
-})
-fastify.get("/scanner", async () => {
-  return runScanner()
-})
+fastify.get("/count", async () => ({
+  count: await getDailyBarCount(),
+}))
+
+fastify.get("/scanner", async () => await runScanner())
 
 try {
   await fastify.listen({ port: 3001 })
-} catch (err) {
-  fastify.log.error(err)
+} catch (error) {
+  fastify.log.error(error)
   process.exit(1)
 }
-/****************************************************************/

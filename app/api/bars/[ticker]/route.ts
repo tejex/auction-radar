@@ -23,7 +23,7 @@ export async function GET(
     ? Math.min(Math.max(Math.trunc(requestedLimit), 1), MAX_LIMIT)
     : DEFAULT_LIMIT
 
-  const bars = getBars(ticker, limit)
+  const bars = (await getBars(ticker, limit))
     .reverse()
     .map(bar => ({
       time: bar.date,
