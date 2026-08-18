@@ -10,7 +10,7 @@
     "lint": "eslint",
     "db:setup": "node --env-file=.env server/jobs/setupDatabase.ts",
     "db:import": "turso db import data/auction-radar.db",
-    "load:eod": "node --env-file=.env server/jobs/loadEod.ts"
+    "load:eod": "node --env-file-if-exists=.env server/jobs/loadEod.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

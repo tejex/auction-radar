@@ -1,0 +1,67 @@
+name: Daily EOD scanner
+
+on:
+  schedule:
+    - cron: "30 18 * * 1-5"
+      timezone: "America/New_York"
+  workflow_dispatch:
+    inputs:
+      market_date:
+        description: "Market date to process (YYYY-MM-DD); defaults to today in New York"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-eod-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.21.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Choose market date
+        id: market-date
+        env:
+          REQUESTED_MARKET_DATE: ${{ inputs.market_date }}
+        shell: bash
+        run: |
+          market_date="$REQUESTED_MARKET_DATE"
+          if [[ -z "$market_date" ]]; then
+            market_date="$(TZ=America/New_York date +%F)"
+          fi
+
+          if [[ ! "$market_date" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "Invalid market date: $market_date" >&2
+            exit 1
+          fi
+
+          echo "market_date=$market_date" >> "$GITHUB_OUTPUT"
+
+      - name: Load market data and save scanner results
+        env:
+          MASSIVE_API_KEY: ${{ secrets.MASSIVE_API_KEY }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+          TURSO_DATABASE_URL: ${{ secrets.TURSO_DATABASE_URL }}
+        run: pnpm load:eod "${{ steps.market-date.outputs.market_date }}"

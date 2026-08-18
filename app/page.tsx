@@ -2,7 +2,6 @@ import { MainPage } from "./components/pages/MainPage"
 import { databaseProvider } from "@/server/db/client"
 import { getLatestScannerResults } from "@/server/db/scannerResults"
 import { initializeDatabase } from "@/server/db/schema"
-import { runScanner } from "@/server/services/serviceFunctions"
 
 export const dynamic = "force-dynamic"
 
@@ -10,8 +9,7 @@ const Home = async () => {
   if (databaseProvider === "sqlite") {
     await initializeDatabase()
   }
-  const storedResults = await getLatestScannerResults()
-  const data = storedResults.length > 0 ? storedResults : await runScanner()
+  const data = await getLatestScannerResults()
 
   return <MainPage data={data} />
 }
