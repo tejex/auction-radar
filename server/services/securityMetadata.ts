@@ -1,8 +1,4 @@
-import {
-  databaseProvider,
-  getPostgresClient,
-  getSqliteClient,
-} from "../db/client.ts"
+import { getDatabaseClient } from "../db/client.ts"
 import { getMassiveClient } from "../clients/massive.ts"
 
 const REQUESTS_PER_WINDOW = 5
@@ -12,22 +8,14 @@ const sleep = (milliseconds: number) =>
   new Promise(resolve => setTimeout(resolve, milliseconds))
 
 async function getRefreshedTickers(asOfDate: string) {
-  if (databaseProvider === "postgres") {
-    const rows = await getPostgresClient()`
-      SELECT ticker
-      FROM security_metadata
-      WHERE as_of_date = ${asOfDate}
-    `
-    return new Set(rows.map(row => String(row.ticker)))
-  }
-
-  const rows = getSqliteClient().prepare(`
-    SELECT ticker
+  const { rows } = await getDatabaseClient().execute({
+    sql: `SELECT ticker
     FROM security_metadata
-    WHERE as_of_date = ?
-  `).all(asOfDate) as { ticker: string }[]
+    WHERE as_of_date = ?`,
+    args: [asOfDate],
+  })
 
-  return new Set(rows.map(row => row.ticker))
+  return new Set(rows.map(row => String(row.ticker)))
 }
 
 async function saveSecurityMetadata(
@@ -36,26 +24,16 @@ async function saveSecurityMetadata(
   marketCap: number | null,
   asOfDate: string
 ) {
-  if (databaseProvider === "postgres") {
-    await getPostgresClient()`
-      INSERT INTO security_metadata (ticker, type, market_cap, as_of_date)
-      VALUES (${ticker}, ${type}, ${marketCap}, ${asOfDate})
-      ON CONFLICT (ticker) DO UPDATE SET
-        type = EXCLUDED.type,
-        market_cap = EXCLUDED.market_cap,
-        as_of_date = EXCLUDED.as_of_date
-    `
-    return
-  }
-
-  getSqliteClient().prepare(`
-    INSERT INTO security_metadata (ticker, type, market_cap, as_of_date)
+  await getDatabaseClient().execute({
+    sql: `INSERT INTO security_metadata
+      (ticker, type, market_cap, as_of_date)
     VALUES (?, ?, ?, ?)
     ON CONFLICT(ticker) DO UPDATE SET
       type = excluded.type,
       market_cap = excluded.market_cap,
-      as_of_date = excluded.as_of_date
-  `).run(ticker, type, marketCap, asOfDate)
+      as_of_date = excluded.as_of_date`,
+    args: [ticker, type, marketCap, asOfDate],
+  })
 }
 
 const isRateLimitError = (error: unknown) => {

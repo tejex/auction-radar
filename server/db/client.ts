@@ -1,35 +1,36 @@
-import { neon } from "@neondatabase/serverless"
-import Database from "better-sqlite3"
+import { createClient } from "@libsql/client"
+import { mkdirSync } from "node:fs"
 
-const databaseUrl = process.env.DATABASE_URL?.trim()
+const tursoDatabaseUrl = process.env.TURSO_DATABASE_URL?.trim() || undefined
+const tursoAuthToken = process.env.TURSO_AUTH_TOKEN?.trim() || undefined
 
-export const databaseProvider = databaseUrl ? "postgres" : "sqlite"
+export const databaseProvider = tursoDatabaseUrl ? "turso" : "sqlite"
 
-const postgresClient = databaseUrl ? neon(databaseUrl) : null
-let sqliteClient: Database.Database | null = null
-
-export function getPostgresClient() {
-  if (!postgresClient) {
-    throw new Error("DATABASE_URL is required for the Postgres database")
-  }
-
-  return postgresClient
+if (tursoDatabaseUrl && !tursoAuthToken) {
+  throw new Error(
+    "TURSO_AUTH_TOKEN is required when TURSO_DATABASE_URL is configured"
+  )
 }
 
-export function getSqliteClient() {
-  if (databaseProvider !== "sqlite") {
-    throw new Error("SQLite is unavailable while DATABASE_URL is configured")
-  }
+if (!tursoDatabaseUrl && process.env.VERCEL) {
+  throw new Error(
+    "TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are required for this Vercel deployment"
+  )
+}
 
-  if (!sqliteClient) {
-    sqliteClient = new Database("data/auction-radar.db")
-    sqliteClient.pragma("journal_mode = WAL")
-  }
+if (!tursoDatabaseUrl) {
+  mkdirSync("data", { recursive: true })
+}
 
-  return sqliteClient
+const database = createClient({
+  url: tursoDatabaseUrl ?? "file:data/auction-radar.db",
+  authToken: tursoAuthToken,
+})
+
+export function getDatabaseClient() {
+  return database
 }
 
 export function closeDatabase() {
-  sqliteClient?.close()
-  sqliteClient = null
+  database.close()
 }

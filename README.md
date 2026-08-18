@@ -1,8 +1,8 @@
 # Auction Radar
 
-Auction Radar is a Next.js market scanner. It uses the existing SQLite database
-for local development and switches to Neon Postgres when `DATABASE_URL` is set.
-The local `data/` directory remains ignored by Git.
+Auction Radar is a Next.js market scanner backed by SQLite-compatible libSQL.
+Local development uses the ignored `data/auction-radar.db` file, while deployed
+environments use Turso when `TURSO_DATABASE_URL` is configured.
 
 ## Local development
 
@@ -10,66 +10,88 @@ Copy the environment-variable template and add the API keys you use:
 
 ```bash
 cp .env.example .env
-npm install
-npm run db:setup
-npm run dev
+pnpm install
+pnpm db:setup
+pnpm dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). No separate Fastify process
 is required by the Next.js app. The production scanner endpoint is available at
 `/api/scanner`, and chart data is served by `/api/bars/[ticker]`.
 
+When `TURSO_DATABASE_URL` is empty, all database commands use the existing local
+SQLite file. The entire `data/` directory remains ignored by Git.
+
+## Import the local database into Turso
+
+Install and authenticate the Turso CLI first:
+
+```bash
+brew install tursodatabase/tap/turso
+turso auth signup
+```
+
+Checkpoint the SQLite WAL so every committed row is in the main database file,
+then create the Turso database directly from that file:
+
+```bash
+sqlite3 data/auction-radar.db "PRAGMA wal_checkpoint(TRUNCATE);"
+pnpm db:import
+```
+
+The import creates a Turso database named `auction-radar` with the existing
+tables, indexes, and data. It does not translate the database to PostgreSQL or
+modify the source schema.
+
+Retrieve the production credentials:
+
+```bash
+turso db show auction-radar --url
+turso db tokens create auction-radar
+```
+
+Set the results in `.env` only if you want local commands to access Turso:
+
+```text
+TURSO_DATABASE_URL=libsql://...
+TURSO_AUTH_TOKEN=...
+```
+
+Leave both variables empty to continue using the local database during
+development.
+
 ## Load end-of-day market data
 
 Pass a completed market date in `YYYY-MM-DD` format:
 
 ```bash
-npm run load:eod -- 2026-08-14
+pnpm load:eod -- 2026-08-14
 ```
 
 The job requests split-adjusted grouped daily bars, refreshes security metadata,
 runs the scanner, and saves the ranked results. Running the scanner itself does
 not call Massive.
 
-## Move the local database to Neon
-
-1. Create a Neon Postgres database and copy its connection string.
-2. Set `DATABASE_URL` in `.env` without removing the existing API keys.
-3. Create the Postgres tables:
-
-   ```bash
-   npm run db:setup
-   ```
-
-4. Import `data/auction-radar.db`:
-
-   ```bash
-   npm run db:migrate:sqlite
-   ```
-
-The import runs in batches, prints progress, and uses upserts, so it is safe to
-restart if the connection is interrupted. It never writes to the SQLite source.
-Because the source contains more than four million bars, the initial import can
-take a while.
-
-To switch local development back to SQLite, remove `DATABASE_URL` from `.env`.
-
 ## Deploy to Vercel
 
-1. Push the repository to GitHub.
-2. Import the repository from the Vercel dashboard.
-3. Connect the Neon database to the Vercel project.
-4. Configure these production environment variables:
+Configure these environment variables for Production, Preview, and Development
+as appropriate:
 
-   ```text
-   DATABASE_URL
-   MASSIVE_API_KEY
-   ALPACA_API_KEY
-   ALPACA_SECRET_KEY
-   CRON_SECRET
-   ```
+```text
+TURSO_DATABASE_URL
+TURSO_AUTH_TOKEN
+MASSIVE_API_KEY
+ALPACA_API_KEY
+ALPACA_SECRET_KEY
+CRON_SECRET
+```
 
-5. Deploy after the database import has completed.
+Remove the previous database integration and all `DATABASE_URL`, `POSTGRES_*`,
+`PG*`, and provider-created environment variables from the Vercel project.
+Redeploy after adding the two Turso credentials.
+
+The production app intentionally refuses to create or use a local SQLite file on
+Vercel when Turso credentials are missing.
 
 `vercel.json` invokes `/api/cron/eod` at 23:30 UTC on weekdays. Vercel supplies
 `Authorization: Bearer <CRON_SECRET>` when `CRON_SECRET` is configured. The route

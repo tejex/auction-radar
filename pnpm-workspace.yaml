@@ -1,5 +1,4 @@
 allowBuilds:
-  better-sqlite3: true
   bufferutil: false
   es5-ext: false
   sharp: false

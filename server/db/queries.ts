@@ -1,8 +1,4 @@
-import {
-  databaseProvider,
-  getPostgresClient,
-  getSqliteClient,
-} from "./client.ts"
+import { getDatabaseClient } from "./client.ts"
 
 export type DailyBar = {
   ticker: string
@@ -31,138 +27,79 @@ function normalizeBar(row: Record<string, unknown>): DailyBar {
 }
 
 export async function getBars(ticker: string, limit = 120) {
-  if (databaseProvider === "postgres") {
-    const rows = await getPostgresClient().query(
-      `SELECT ticker, date::text AS date, open, high, low, close,
-        volume::double precision AS volume, source, adjustment
-      FROM daily_bars
-      WHERE ticker = $1
-      ORDER BY date DESC
-      LIMIT $2`,
-      [ticker, limit]
-    )
-
-    return rows.map(row => normalizeBar(row))
-  }
-
-  return getSqliteClient().prepare(`
-    SELECT *
+  const { rows } = await getDatabaseClient().execute({
+    sql: `SELECT ticker, date, open, high, low, close, volume, source,
+      adjustment
     FROM daily_bars
     WHERE ticker = ?
     ORDER BY date DESC
-    LIMIT ?
-  `).all(ticker, limit).map(row => normalizeBar(row as Record<string, unknown>))
+    LIMIT ?`,
+    args: [ticker, limit],
+  })
+
+  return rows.map(row => normalizeBar(row))
 }
 
 export async function getTickersForLatestDate(): Promise<string[]> {
-  if (databaseProvider === "postgres") {
-    const rows = await getPostgresClient()`
-      SELECT DISTINCT ticker
-      FROM daily_bars
-      WHERE date = (SELECT MAX(date) FROM daily_bars)
-    `
-
-    return rows.map(row => String(row.ticker))
-  }
-
-  const rows = getSqliteClient().prepare(`
+  const { rows } = await getDatabaseClient().execute(`
     SELECT DISTINCT ticker
     FROM daily_bars
     WHERE date = (SELECT MAX(date) FROM daily_bars)
-  `).all() as { ticker: string }[]
+  `)
 
-  return rows.map(row => row.ticker)
+  return rows.map(row => String(row.ticker))
 }
 
 export async function getEligibleCommonStockTickers(
   minimumMarketCap: number
 ) {
-  if (databaseProvider === "postgres") {
-    const rows = await getPostgresClient()`
-      SELECT ticker
-      FROM security_metadata
-      WHERE type = 'CS'
-        AND market_cap >= ${minimumMarketCap}
-    `
-
-    return new Set(rows.map(row => String(row.ticker)))
-  }
-
-  const rows = getSqliteClient().prepare(`
-    SELECT ticker
+  const { rows } = await getDatabaseClient().execute({
+    sql: `SELECT ticker
     FROM security_metadata
     WHERE type = 'CS'
-      AND market_cap >= ?
-  `).all(minimumMarketCap) as { ticker: string }[]
+      AND market_cap >= ?`,
+    args: [minimumMarketCap],
+  })
 
-  return new Set(rows.map(row => row.ticker))
+  return new Set(rows.map(row => String(row.ticker)))
 }
 
 export async function getLatestBarHistories(limit = 120) {
   const histories = new Map<string, DailyBar[]>()
+  const tickers = await getTickersForLatestDate()
+  const database = getDatabaseClient()
+  const batchSize = 100
 
-  if (databaseProvider === "postgres") {
-    const rows = await getPostgresClient().query(
-      `WITH latest_tickers AS (
-        SELECT DISTINCT ticker
+  for (let offset = 0; offset < tickers.length; offset += batchSize) {
+    const batchTickers = tickers.slice(offset, offset + batchSize)
+    const results = await database.batch(
+      batchTickers.map(ticker => ({
+        sql: `SELECT ticker, date, open, high, low, close, volume, source,
+          adjustment
         FROM daily_bars
-        WHERE date = (SELECT MAX(date) FROM daily_bars)
-      )
-      SELECT bars.ticker, bars.date::text AS date, bars.open, bars.high,
-        bars.low, bars.close, bars.volume::double precision AS volume,
-        bars.source, bars.adjustment
-      FROM latest_tickers
-      CROSS JOIN LATERAL (
-        SELECT *
-        FROM daily_bars
-        WHERE daily_bars.ticker = latest_tickers.ticker
+        WHERE ticker = ?
         ORDER BY date DESC
-        LIMIT $1
-      ) AS bars
-      ORDER BY bars.ticker, bars.date DESC`,
-      [limit]
+        LIMIT ?`,
+        args: [ticker, limit],
+      })),
+      "read"
     )
 
-    for (const row of rows) {
-      const bar = normalizeBar(row)
-      const tickerBars = histories.get(bar.ticker) ?? []
-      tickerBars.push(bar)
-      histories.set(bar.ticker, tickerBars)
+    for (let index = 0; index < batchTickers.length; index++) {
+      histories.set(
+        batchTickers[index],
+        results[index].rows.map(row => normalizeBar(row))
+      )
     }
-
-    return histories
-  }
-
-  const tickers = await getTickersForLatestDate()
-  const selectBars = getSqliteClient().prepare(`
-    SELECT *
-    FROM daily_bars
-    WHERE ticker = ?
-    ORDER BY date DESC
-    LIMIT ?
-  `)
-
-  for (const ticker of tickers) {
-    const bars = selectBars
-      .all(ticker, limit)
-      .map(row => normalizeBar(row as Record<string, unknown>))
-    histories.set(ticker, bars)
   }
 
   return histories
 }
 
 export async function getDailyBarCount() {
-  if (databaseProvider === "postgres") {
-    const [row] = await getPostgresClient()`
-      SELECT COUNT(*)::double precision AS count FROM daily_bars
-    `
-    return Number(row?.count ?? 0)
-  }
+  const { rows } = await getDatabaseClient().execute(
+    "SELECT COUNT(*) AS count FROM daily_bars"
+  )
 
-  const row = getSqliteClient()
-    .prepare("SELECT COUNT(*) AS count FROM daily_bars")
-    .get() as { count: number }
-
-  return row.count
+  return Number(rows[0]?.count ?? 0)
 }
