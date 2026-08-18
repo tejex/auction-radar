@@ -50,18 +50,20 @@ export async function getTickersForLatestDate(): Promise<string[]> {
   return rows.map(row => String(row.ticker))
 }
 
-export async function getEligibleCommonStockTickers(
+export async function getEligibleCommonStockMarketCaps(
   minimumMarketCap: number
 ) {
   const { rows } = await getDatabaseClient().execute({
-    sql: `SELECT ticker
+    sql: `SELECT ticker, market_cap
     FROM security_metadata
     WHERE type = 'CS'
       AND market_cap >= ?`,
     args: [minimumMarketCap],
   })
 
-  return new Set(rows.map(row => String(row.ticker)))
+  return new Map(
+    rows.map(row => [String(row.ticker), Number(row.market_cap)])
+  )
 }
 
 export async function getLatestBarHistories(limit = 120) {

@@ -11,15 +11,29 @@ function parsePayload(payload: unknown): ScannerResult {
 
 export async function getLatestScannerResults(limit = 40) {
   const { rows } = await getDatabaseClient().execute({
-    sql: `SELECT payload
+    sql: `SELECT scanner_results.payload, security_metadata.market_cap
     FROM scanner_results
-    WHERE scan_date = (SELECT MAX(scan_date) FROM scanner_results)
-    ORDER BY outlier_score DESC
+    LEFT JOIN security_metadata
+      ON security_metadata.ticker = scanner_results.ticker
+    WHERE scanner_results.scan_date = (
+      SELECT MAX(scan_date) FROM scanner_results
+    )
+    ORDER BY scanner_results.outlier_score DESC
     LIMIT ?`,
     args: [limit],
   })
 
-  return rows.map(row => parsePayload(row.payload))
+  return rows.map(row => {
+    const result = parsePayload(row.payload)
+    const storedMarketCap = row.market_cap
+
+    return {
+      ...result,
+      marketCap: storedMarketCap === null || storedMarketCap === undefined
+        ? result.marketCap ?? null
+        : Number(storedMarketCap),
+    }
+  })
 }
 
 export async function replaceScannerResults(

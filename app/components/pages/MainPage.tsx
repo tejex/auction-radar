@@ -25,7 +25,7 @@ export const MainPage = ({ data }: MainPageProps) => {
       }}
     >
       <header
-        className="flex min-h-14 min-w-[64rem] shrink-0 items-center rounded-lg border px-4"
+        className="flex min-h-14 shrink-0 items-center rounded-lg border px-4"
         style={{
           backgroundColor: palette.page.headerBackground,
           borderColor: palette.page.headerBorder,
@@ -47,8 +47,8 @@ export const MainPage = ({ data }: MainPageProps) => {
         </div>
       </header>
 
-      <div className="grid min-h-[36rem] min-w-[64rem] flex-1 grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3">
-        <div className="h-full min-h-0 w-full">
+      <div className="grid min-h-[72rem] flex-1 grid-cols-1 gap-3 min-[64rem]:min-h-[36rem] min-[64rem]:grid-cols-[minmax(0,7fr)_minmax(18rem,3fr)]">
+        <div className="h-full min-h-[36rem] w-full min-w-0 min-[64rem]:min-h-0">
           <Table
             data={data}
             onTickerSelect={setSelectedTicker}
@@ -56,7 +56,7 @@ export const MainPage = ({ data }: MainPageProps) => {
           />
         </div>
 
-        <div className="h-full min-h-0 w-full overflow-hidden">
+        <div className="h-full min-h-[24rem] w-full min-w-0 overflow-hidden min-[64rem]:min-h-0">
           <StockChart key={selectedTicker} ticker={selectedTicker} />
         </div>
       </div>

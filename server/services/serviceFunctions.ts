@@ -1,16 +1,15 @@
 import type { ScannerResult } from "../../app/types.ts"
 import {
   getBars,
-  getEligibleCommonStockTickers,
+  getEligibleCommonStockMarketCaps,
   getLatestBarHistories,
 } from "../db/queries.ts"
 import type { DailyBar } from "../db/queries.ts"
 
-const MINIMUM_MARKET_CAP = 1_000_000_000
+const MINIMUM_MARKET_CAP = 5_000_000_000
 const MINIMUM_HISTORY_SESSIONS = 120
 const LIQUIDITY_WINDOW_SESSIONS = 20
 const MINIMUM_AVERAGE_DOLLAR_VOLUME = 25_000_000
-const RESULT_LIMIT = 40
 
 const average = (values: number[]) =>
   values.reduce((sum, value) => sum + value, 0) / values.length
@@ -143,6 +142,7 @@ export function scanBars(ticker: string, bars: DailyBar[]): ScannerResult | null
 
   return {
     ticker,
+    marketCap: null,
     gap,
     range,
     return1d,
@@ -177,14 +177,20 @@ export async function getOutlierCandidates() {
 }
 
 export async function rankOutlierCandidates(candidates: ScannerResult[]) {
-  const eligibleTickers = await getEligibleCommonStockTickers(
+  const eligibleMarketCaps = await getEligibleCommonStockMarketCaps(
     MINIMUM_MARKET_CAP
   )
 
   return candidates
-    .filter(result => eligibleTickers.has(result.ticker))
+    .flatMap(result => {
+      const marketCap = eligibleMarketCaps.get(result.ticker)
+
+      return marketCap === undefined
+        ? []
+        : [{ ...result, marketCap }]
+    })
     .sort((a, b) => b.outlierScore - a.outlierScore)
-    .slice(0, RESULT_LIMIT)
+    // .slice(0, RESULT_LIMIT)
 }
 
 export async function runScanner() {
