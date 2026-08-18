@@ -64,6 +64,10 @@ export const TABLE_PRESENTATION_OPTIONS = {
   muiTableProps: {
     sx: {
       backgroundColor: palette.table.background,
+      minWidth: "50rem",
+      "@media (min-width: 112rem)": {
+        minWidth: "58rem",
+      },
     },
   },
   muiTableHeadRowProps: {
@@ -82,19 +86,40 @@ export const TABLE_PRESENTATION_OPTIONS = {
         ? `1px solid ${palette.table.border}`
         : undefined,
       color: palette.table.text,
-      px: 1.25,
+      fontSize: "0.6875rem",
+      px: 0.75,
       py: 1.5,
       whiteSpace: "nowrap",
+      "@media (min-width: 40rem)": {
+        fontSize: "0.75rem",
+      },
+      "@media (min-width: 112rem)": {
+        fontSize: "0.875rem",
+        px: 1.25,
+      },
       "& .MuiTableSortLabel-root": {
         color: `${palette.table.mutedText} !important`,
         opacity: 1,
+      },
+      "& .MuiBadge-root": {
+        width: "1.0625rem",
+        "@media (min-width: 112rem)": {
+          width: "auto",
+        },
       },
       "& .MuiTableSortLabel-root:hover, & .MuiTableSortLabel-root.Mui-active": {
         color: `${palette.table.text} !important`,
       },
       "& .MuiTableSortLabel-icon": {
         color: `${palette.table.text} !important`,
+        fontSize: "0.75rem",
+        marginLeft: "0.0625rem",
+        marginRight: 0,
         opacity: "0.9 !important",
+        "@media (min-width: 112rem)": {
+          fontSize: "1.125rem",
+          marginLeft: "0.25rem",
+        },
       },
       "& .MuiTableSortLabel-root.Mui-active .MuiTableSortLabel-icon": {
         color: `${palette.table.text} !important`,
@@ -111,9 +136,12 @@ export const TABLE_PRESENTATION_OPTIONS = {
         ? `1px solid ${palette.table.border}`
         : undefined,
       color: palette.table.text,
-      px: 1.25,
+      px: 0.75,
       py: 1.15,
       whiteSpace: "nowrap",
+      "@media (min-width: 112rem)": {
+        px: 1.25,
+      },
     },
   }),
 } satisfies Partial<MRT_TableOptions<ScannerTableRow>>

@@ -38,3 +38,9 @@ export const PercentileValue = ({ value }: { value: number | null }) => (
 export const VolumeValue = ({ value }: { value: number }) => (
   <span title={value.toLocaleString("en-US")}>{formatCompactNumber(value)}</span>
 )
+
+export const MarketCapValue = ({ value }: { value: number | null }) => (
+  <span title={value === null ? undefined : `$${value.toLocaleString("en-US")}`}>
+    {value === null ? "—" : `$${formatCompactNumber(value)}`}
+  </span>
+)

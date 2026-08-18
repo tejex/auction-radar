@@ -1,5 +1,6 @@
 export type ScannerResult = {
   ticker: string
+  marketCap: number | null
   gap: number
   range: number
   return1d: number

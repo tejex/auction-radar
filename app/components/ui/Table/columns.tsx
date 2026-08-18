@@ -1,5 +1,6 @@
 import type { MRT_ColumnDef } from "material-react-table"
 import {
+  MarketCapValue,
   MovementValue,
   PercentileValue,
   TickerValue,
@@ -51,8 +52,20 @@ export const createTableColumns = ({
   {
     accessorKey: "ticker",
     header: "Ticker",
-    size: 60,
+    size: 76,
     Cell: ({ cell }) => <TickerValue ticker={cell.getValue<string>()} />,
+  },
+  {
+    accessorKey: "marketCap",
+    header: "Market Cap",
+    size: 100,
+    sortingFn: (rowA, rowB) => compareNullableNumbers(
+      rowA.original.marketCap,
+      rowB.original.marketCap,
+    ),
+    Cell: ({ cell }) => (
+      <MarketCapValue value={cell.getValue<number | null>()} />
+    ),
   },
   {
     id: "movementMetric",
@@ -66,7 +79,7 @@ export const createTableColumns = ({
         value={movementMetric}
       />
     ),
-    size: 60,
+    size: 92,
     sortingFn: (rowA, rowB) => compareNullableNumbers(
       rowA.original[movementMetric],
       rowB.original[movementMetric],
@@ -86,7 +99,7 @@ export const createTableColumns = ({
         value={returnWindow}
       />
     ),
-    size: 80,
+    size: 116,
     Cell: ({ cell }) => (
       <MovementValue value={cell.getValue<number | null>()} />
     ),
@@ -103,7 +116,7 @@ export const createTableColumns = ({
         value={movementPercentileMetric}
       />
     ),
-    size: 50,
+    size: 108,
     sortingFn: (rowA, rowB) => compareNullableNumbers(
       rowA.original[movementPercentileMetric],
       rowB.original[movementPercentileMetric],
@@ -123,7 +136,7 @@ export const createTableColumns = ({
         value={displacementWindow}
       />
     ),
-    size: 50,
+    size: 88,
     Cell: ({ cell }) => (
       <PercentileValue value={cell.getValue<number | null>()} />
     ),
@@ -140,7 +153,7 @@ export const createTableColumns = ({
         value={volumeMetric}
       />
     ),
-    size: 80,
+    size: 114,
     sortingFn: (rowA, rowB) => compareNullableNumbers(
       rowA.original[volumeMetric],
       rowB.original[volumeMetric],
@@ -152,7 +165,7 @@ export const createTableColumns = ({
   {
     accessorKey: "maxDisplacementPercentile",
     header: "Max Disp. %",
-    size: 112,
+    size: 100,
     Cell: ({ cell }) => (
       <PercentileValue value={cell.getValue<number>()} />
     ),

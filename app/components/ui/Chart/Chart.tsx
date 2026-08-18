@@ -19,12 +19,6 @@ type StockChartProps = {
   ticker: string | null
 }
 
-const formatPrice = (value: number) =>
-  value.toLocaleString("en-US", {
-    maximumFractionDigits: value >= 100 ? 2 : 4,
-    minimumFractionDigits: 2,
-  })
-
 export const StockChart = ({ ticker }: StockChartProps) => {
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const initialBars = ticker ? (barsCache.get(ticker) ?? []) : []
@@ -199,31 +193,20 @@ export const StockChart = ({ ticker }: StockChartProps) => {
       }}
     >
       <header
-        className="flex min-h-12 shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2"
+        className="flex min-h-12 shrink-0 items-center gap-3 border-b px-4 py-2"
         style={{ borderColor: palette.chart.border }}
       >
-        <div className="mr-1 flex items-baseline gap-2">
-          <span>
-            {ticker ?? "No ticker selected"}
+        <span>{ticker ?? "No ticker selected"}</span>
+        {change !== null && (
+          <span
+            style={{
+              color: change >= 0
+                ? palette.chart.candleUp
+                : palette.chart.candleDown,
+            }}
+          >
+            {change >= 0 ? "+" : ""}{change.toFixed(2)}%
           </span>
-          {bars.length > 0 && (
-            <span style={{ color: palette.chart.mutedText }}>
-              1D · {bars.length} sessions
-            </span>
-          )}
-        </div>
-        {activeBar && (
-          <>
-            <span>O {formatPrice(activeBar.open)}</span>
-            <span>H {formatPrice(activeBar.high)}</span>
-            <span>L {formatPrice(activeBar.low)}</span>
-            <span>C {formatPrice(activeBar.close)}</span>
-            {change !== null && (
-              <span>
-                {change >= 0 ? "+" : ""}{change.toFixed(2)}%
-              </span>
-            )}
-          </>
         )}
       </header>
 
